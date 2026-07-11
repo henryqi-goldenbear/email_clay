@@ -1,0 +1,95 @@
+name: Clay Outbound Follow-ups
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: clay-outbound-followups
+  cancel-in-progress: false
+
+jobs:
+  send-due-emails:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout application code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Load cloud state branch
+        run: |
+          mkdir -p state
+          if git ls-remote --exit-code --heads origin cloud-state >/dev/null 2>&1; then
+            git fetch origin cloud-state
+            git checkout origin/cloud-state -- contacts.db .gmail_tokens.json "henry_swe (4).pdf" scheduler.log 2>/dev/null || true
+            for file in contacts.db .gmail_tokens.json "henry_swe (4).pdf" scheduler.log; do
+              if [ -f "$file" ]; then
+                mv "$file" state/
+              fi
+            done
+          fi
+
+      - name: Verify state exists
+        run: |
+          test -f state/contacts.db || (echo "Missing state/contacts.db. Run: python github_sync.py push" && exit 1)
+          test -f state/.gmail_tokens.json || (echo "Missing Gmail tokens. Run: python github_sync.py push" && exit 1)
+          test -f "state/henry_swe (4).pdf" || (echo "Missing resume. Run: python github_sync.py push" && exit 1)
+
+      - name: Write runtime .env
+        env:
+          GMAIL_OAUTH_CLIENT_ID: ${{ secrets.GMAIL_OAUTH_CLIENT_ID }}
+          GMAIL_OAUTH_CLIENT_SECRET: ${{ secrets.GMAIL_OAUTH_CLIENT_SECRET }}
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          BUSINESS_TIMEZONE: ${{ secrets.BUSINESS_TIMEZONE }}
+          BUSINESS_HOUR_START: ${{ secrets.BUSINESS_HOUR_START }}
+          BUSINESS_HOUR_END: ${{ secrets.BUSINESS_HOUR_END }}
+        run: |
+          cat > state/.env <<EOF
+          GMAIL_OAUTH_CLIENT_ID=${GMAIL_OAUTH_CLIENT_ID}
+          GMAIL_OAUTH_CLIENT_SECRET=${GMAIL_OAUTH_CLIENT_SECRET}
+          SENDER_EMAIL=${SENDER_EMAIL}
+          SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+          SMTP_PORT=${SMTP_PORT:-587}
+          SMTP_USER=${SMTP_USER}
+          BUSINESS_TIMEZONE=${BUSINESS_TIMEZONE:-America/Los_Angeles}
+          BUSINESS_HOUR_START=${BUSINESS_HOUR_START:-8}
+          BUSINESS_HOUR_END=${BUSINESS_HOUR_END:-17}
+          EOF
+
+      - name: Install dependencies
+        run: pip install python-dotenv
+
+      - name: Send due follow-ups
+        env:
+          CLAY_OUTBOUND_DATA_DIR: ${{ github.workspace }}/state
+        run: python run_scheduled_outbound.py
+
+      - name: Publish updated state
+        run: |
+          work=$(mktemp -d)
+          cd "$work"
+          git init
+          git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}"
+          cp "${GITHUB_WORKSPACE}/state/contacts.db" .
+          cp "${GITHUB_WORKSPACE}/state/.gmail_tokens.json" .
+          cp "${GITHUB_WORKSPACE}/state/henry_swe (4).pdf" .
+          cp "${GITHUB_WORKSPACE}/state/scheduler.log" . 2>/dev/null || true
+          git checkout --orphan cloud-state
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No state changes"
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "chore: update outbound state [skip ci]"
+          git push --force origin HEAD:cloud-state

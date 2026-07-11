@@ -1,0 +1,8 @@
+services:
+  followups:
+    build:
+      context: ..
+      dockerfile: cloud/Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ./data:/data

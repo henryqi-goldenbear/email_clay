@@ -1,0 +1,14 @@
+.env
+.clay_tokens.json
+.gmail_tokens.json
+.clay_oauth_client.json
+contacts.db
+outbound_queue/
+resume_text.txt
+scheduler.log
+__pycache__/
+*.pyc
+
+# Cloud deploy config (contains server host)
+cloud/config.json
+cloud/github_config.json
