@@ -17,13 +17,13 @@ This sets `CLOUD_FOLLOWUPS=github` in your `.env`.
 ```powershell
 cd c:\Users\zhiha\clay_outbound
 git init
-git remote add origin https://github.com/YOUR_USERNAME/clay-outbound.git
+git remote add origin https://github.com/henryqi-goldenbear/email_clay.git
 git add .
 git commit -m "Clay outbound"
 git push -u origin main
 ```
 
-**Must be private** — the `cloud-state` branch stores your Gmail tokens.
+**Must be private** — Gmail tokens live in GitHub Secrets, not in git.
 
 ### 3. Add GitHub Actions secrets
 
@@ -35,6 +35,7 @@ Add these (values from your `.env`):
 |--------|---------|
 | `GMAIL_OAUTH_CLIENT_ID` | from `.env` |
 | `GMAIL_OAUTH_CLIENT_SECRET` | from `.env` |
+| `GMAIL_REFRESH_TOKEN` | `refresh_token` from `.gmail_tokens.json` |
 | `SENDER_EMAIL` | `henryqi@berkeley.edu` |
 | `SMTP_HOST` | `smtp.gmail.com` |
 | `SMTP_PORT` | `587` |
@@ -67,7 +68,7 @@ Step 1 sends locally, state auto-syncs to GitHub, follow-ups (+1 day, +3 days) s
 |-------|------|
 | **Your PC** | `main.py` — Clay search, Mistral emails, step 1 |
 | **GitHub Actions** | Runs every 15 min, sends due follow-ups |
-| **`cloud-state` branch** | Stores `contacts.db`, Gmail tokens, resume |
+| **`cloud-state` branch** | Stores `contacts.db` and resume |
 
 ## Useful commands
 

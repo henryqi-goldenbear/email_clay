@@ -28,8 +28,8 @@ jobs:
           mkdir -p state
           if git ls-remote --exit-code --heads origin cloud-state >/dev/null 2>&1; then
             git fetch origin cloud-state
-            git checkout origin/cloud-state -- contacts.db .gmail_tokens.json "henry_swe (4).pdf" scheduler.log 2>/dev/null || true
-            for file in contacts.db .gmail_tokens.json "henry_swe (4).pdf" scheduler.log; do
+            git checkout origin/cloud-state -- contacts.db "henry_swe (4).pdf" scheduler.log 2>/dev/null || true
+            for file in contacts.db "henry_swe (4).pdf" scheduler.log; do
               if [ -f "$file" ]; then
                 mv "$file" state/
               fi
@@ -39,8 +39,8 @@ jobs:
       - name: Verify state exists
         run: |
           test -f state/contacts.db || (echo "Missing state/contacts.db. Run: python github_sync.py push" && exit 1)
-          test -f state/.gmail_tokens.json || (echo "Missing Gmail tokens. Run: python github_sync.py push" && exit 1)
           test -f "state/henry_swe (4).pdf" || (echo "Missing resume. Run: python github_sync.py push" && exit 1)
+          test -n "${{ secrets.GMAIL_REFRESH_TOKEN }}" || (echo "Missing GMAIL_REFRESH_TOKEN secret" && exit 1)
 
       - name: Write runtime .env
         env:
@@ -66,6 +66,17 @@ jobs:
           BUSINESS_HOUR_END=${BUSINESS_HOUR_END:-17}
           EOF
 
+      - name: Write Gmail refresh token
+        env:
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+        run: |
+          cat > state/.gmail_tokens.json <<EOF
+          {
+            "refresh_token": "${GMAIL_REFRESH_TOKEN}",
+            "token_type": "Bearer"
+          }
+          EOF
+
       - name: Install dependencies
         run: pip install python-dotenv
 
@@ -81,7 +92,6 @@ jobs:
           git init
           git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}"
           cp "${GITHUB_WORKSPACE}/state/contacts.db" .
-          cp "${GITHUB_WORKSPACE}/state/.gmail_tokens.json" .
           cp "${GITHUB_WORKSPACE}/state/henry_swe (4).pdf" .
           cp "${GITHUB_WORKSPACE}/state/scheduler.log" . 2>/dev/null || true
           git checkout --orphan cloud-state

@@ -14,6 +14,7 @@ CONFIG_PATH = Path(__file__).resolve().parent / "github_config.json"
 SECRET_KEYS = (
     "GMAIL_OAUTH_CLIENT_ID",
     "GMAIL_OAUTH_CLIENT_SECRET",
+    "GMAIL_REFRESH_TOKEN",
     "SENDER_EMAIL",
     "SMTP_HOST",
     "SMTP_PORT",
@@ -83,10 +84,21 @@ def _print_secrets_checklist(env_values: dict[str, str]) -> None:
         "BUSINESS_HOUR_END": "17",
     }
     for key in SECRET_KEYS:
+        if key == "GMAIL_REFRESH_TOKEN":
+            token_path = PROJECT_DIR / ".gmail_tokens.json"
+            if token_path.exists():
+                payload = json.loads(token_path.read_text(encoding="utf-8"))
+                value = str(payload.get("refresh_token") or "")
+                status = "copy value below into GitHub secret" if value else "MISSING"
+                print(f"  {key} = ({status})")
+            else:
+                print(f"  {key} = MISSING (.gmail_tokens.json not found)")
+            continue
         value = env_values.get(key) or defaults.get(key, "")
         status = "ok" if value else "MISSING in .env"
         print(f"  {key} = {value or status}")
-    print("\nRepo must be PRIVATE (cloud-state branch stores Gmail tokens).")
+    print("\nRepo must be PRIVATE.")
+    print("Gmail tokens go in Secrets only (never in git).")
     print("Enable Actions: Settings -> Actions -> General -> Allow all actions.")
 
 
@@ -105,7 +117,7 @@ def deploy() -> None:
     except RuntimeError:
         print(
             "\nCreate a PRIVATE GitHub repo, then run:\n"
-            "  git remote add origin https://github.com/YOU/clay-outbound.git\n"
+            "  git remote add origin https://github.com/henryqi-goldenbear/email_clay.git\n"
             "  git add .\n"
             "  git commit -m \"Initial commit\"\n"
             "  git push -u origin main\n"

@@ -13,7 +13,6 @@ from dotenv import load_dotenv
 
 from paths import (
     CONTACTS_DB,
-    GMAIL_TOKENS,
     PROJECT_DIR,
     RESUME_PDF,
     SCHEDULER_LOG,
@@ -21,9 +20,9 @@ from paths import (
 
 CLOUD_STATE_BRANCH = "cloud-state"
 
+# Gmail tokens stay in GitHub Actions secrets (push protection blocks git storage).
 SYNC_FILES = (
     CONTACTS_DB,
-    GMAIL_TOKENS,
     RESUME_PDF,
     SCHEDULER_LOG,
 )

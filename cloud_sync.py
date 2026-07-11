@@ -24,7 +24,6 @@ CONFIG_PATH = CLOUD_DIR / "config.json"
 
 SYNC_FILES = (
     CONTACTS_DB,
-    GMAIL_TOKENS,
     RESUME_PDF,
     SCHEDULER_LOG,
 )
