@@ -19,9 +19,9 @@ jobs:
 
     steps:
       - name: Checkout application code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Load cloud state branch
         run: |
@@ -34,13 +34,52 @@ jobs:
                 mv "$file" state/
               fi
             done
+          else
+            echo "::warning::cloud-state branch not found yet"
           fi
+          ls -la state || true
 
-      - name: Verify state exists
+      - name: Verify cloud state files
         run: |
-          test -f state/contacts.db || (echo "Missing state/contacts.db. Run: python github_sync.py push" && exit 1)
-          test -f "state/henry_swe (4).pdf" || (echo "Missing resume. Run: python github_sync.py push" && exit 1)
-          test -n "${{ secrets.GMAIL_REFRESH_TOKEN }}" || (echo "Missing GMAIL_REFRESH_TOKEN secret" && exit 1)
+          set -e
+          if [ ! -f state/contacts.db ]; then
+            echo "::error::Missing state/contacts.db. On your PC run: python github_sync.py push"
+            exit 1
+          fi
+          if [ ! -f "state/henry_swe (4).pdf" ]; then
+            echo "::error::Missing resume in cloud-state. On your PC run: python github_sync.py push"
+            exit 1
+          fi
+          echo "Cloud state files OK"
+
+      - name: Verify GitHub secrets
+        env:
+          GMAIL_OAUTH_CLIENT_ID: ${{ secrets.GMAIL_OAUTH_CLIENT_ID }}
+          GMAIL_OAUTH_CLIENT_SECRET: ${{ secrets.GMAIL_OAUTH_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+        run: |
+          set -e
+          missing=0
+          check_secret() {
+            name="$1"
+            value="$2"
+            if [ -z "$value" ]; then
+              echo "::error::Missing repository secret: $name"
+              missing=1
+            fi
+          }
+          check_secret GMAIL_OAUTH_CLIENT_ID "$GMAIL_OAUTH_CLIENT_ID"
+          check_secret GMAIL_OAUTH_CLIENT_SECRET "$GMAIL_OAUTH_CLIENT_SECRET"
+          check_secret GMAIL_REFRESH_TOKEN "$GMAIL_REFRESH_TOKEN"
+          check_secret SENDER_EMAIL "$SENDER_EMAIL"
+          check_secret SMTP_USER "$SMTP_USER"
+          if [ "$missing" -ne 0 ]; then
+            echo "Add secrets at: Settings -> Secrets and variables -> Actions"
+            exit 1
+          fi
+          echo "Required secrets present"
 
       - name: Write runtime .env
         env:
@@ -70,12 +109,21 @@ jobs:
         env:
           GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
         run: |
-          cat > state/.gmail_tokens.json <<EOF
-          {
-            "refresh_token": "${GMAIL_REFRESH_TOKEN}",
-            "token_type": "Bearer"
-          }
-          EOF
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          Path("state/.gmail_tokens.json").write_text(
+              json.dumps(
+                  {
+                      "refresh_token": os.environ["GMAIL_REFRESH_TOKEN"],
+                      "token_type": "Bearer",
+                  }
+              ),
+              encoding="utf-8",
+          )
+          PY
 
       - name: Install dependencies
         run: pip install python-dotenv
@@ -83,9 +131,17 @@ jobs:
       - name: Send due follow-ups
         env:
           CLAY_OUTBOUND_DATA_DIR: ${{ github.workspace }}/state
-        run: python run_scheduled_outbound.py
+        run: |
+          python run_scheduled_outbound.py
+          exit_code=$?
+          if [ -f state/scheduler.log ]; then
+            echo "----- scheduler.log -----"
+            tail -n 20 state/scheduler.log || true
+          fi
+          exit $exit_code
 
       - name: Publish updated state
+        if: success() || failure()
         run: |
           work=$(mktemp -d)
           cd "$work"
