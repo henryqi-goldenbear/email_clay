@@ -5,8 +5,6 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pypdf import PdfReader
-
 from paths import RESUME_PDF, RESUME_TEXT_CACHE
 
 SENDER_NAME = "Henry Qi"
@@ -21,6 +19,8 @@ def get_resume_text() -> str:
 
     if not RESUME_PDF.exists():
         raise FileNotFoundError(f"Resume not found: {RESUME_PDF}")
+
+    from pypdf import PdfReader
 
     reader = PdfReader(str(RESUME_PDF))
     text = "\n".join(page.extract_text() or "" for page in reader.pages).strip()
