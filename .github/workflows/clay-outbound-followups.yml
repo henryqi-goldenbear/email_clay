@@ -28,8 +28,8 @@ jobs:
           mkdir -p state
           if git ls-remote --exit-code --heads origin cloud-state >/dev/null 2>&1; then
             git fetch origin cloud-state
-            git checkout origin/cloud-state -- contacts.db "henry_swe (4).pdf" scheduler.log 2>/dev/null || true
-            for file in contacts.db "henry_swe (4).pdf" scheduler.log; do
+            git checkout origin/cloud-state -- contacts.db "henry_swe (8).pdf" scheduler.log 2>/dev/null || true
+            for file in contacts.db "henry_swe (8).pdf" scheduler.log; do
               if [ -f "$file" ]; then
                 mv "$file" state/
               fi
@@ -46,7 +46,7 @@ jobs:
             echo "::error::Missing state/contacts.db. On your PC run: python github_sync.py push"
             exit 1
           fi
-          if [ ! -f "state/henry_swe (4).pdf" ]; then
+          if [ ! -f "state/henry_swe (8).pdf" ]; then
             echo "::error::Missing resume in cloud-state. On your PC run: python github_sync.py push"
             exit 1
           fi
@@ -147,7 +147,7 @@ jobs:
           git init
           git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}"
           cp "${GITHUB_WORKSPACE}/state/contacts.db" .
-          cp "${GITHUB_WORKSPACE}/state/henry_swe (4).pdf" .
+          cp "${GITHUB_WORKSPACE}/state/henry_swe (8).pdf" .
           cp "${GITHUB_WORKSPACE}/state/scheduler.log" . 2>/dev/null || true
           git checkout --orphan cloud-state
           git add -A
